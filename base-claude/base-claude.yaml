@@ -13,6 +13,9 @@ capabilities:
           - platform.claude.com
           - downloads.claude.ai
 
+  # Adapted from the examples/claude kit in docker/sandbox-kit-spec
+  # (https://github.com/docker/sandbox-kit-spec, Apache-2.0).
+  #
   # claude.ai OAuth (/login), held on the host. The proxy intercepts the
   # token exchange at platform.claude.com, keeps the real access and
   # refresh tokens, and renders sentinels into ~/.claude/.credentials.json;

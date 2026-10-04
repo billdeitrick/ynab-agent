@@ -2,10 +2,14 @@
 # The YNAB MCP server (calebl/ynab-mcp-server) as a mixin: the server built
 # from a pinned release commit plus its own Node runtime, the YNAB token
 # held on the host and injected by the proxy, and a stdio registration with
-# Claude Code. Read-only: the proxy admits only GETs to api.ynab.com, so
-# the write tools are listed but refused with 403. Compose ../ynab-write as
-# well to allow changes; it also sets YNAB_WRITES_ENABLED=true, the signal
-# the agent context tells Claude to check before writing.
+# Claude Code. The server is Caleb LeNoir's ynab-mcp-server
+# (https://github.com/calebl/ynab-mcp-server, MIT), built unmodified; this
+# kit only packages it.
+#
+# Read-only: the proxy admits only GETs to api.ynab.com, so the write tools
+# are listed but refused with 403. Compose ../ynab-write as well to allow
+# changes; it also sets YNAB_WRITES_ENABLED=true, the signal the agent
+# context tells Claude to check before writing.
 #
 # Bind the token on the host, scoped to one sandbox:
 #   sbx secret set ynab --sandbox <name>     # a YNAB Personal Access Token
