@@ -23,7 +23,6 @@ analyze your budget, but the sandbox refuses any request that would modify it.
 | `ynab-write/` | v3 mixin | Opt-in writes: full access to `api.ynab.com` and `YNAB_WRITES_ENABLED=true` |
 | `ynab-read.sbxenv.yaml` | `sbx env` file | Read-only sandbox: `base-claude` + `ynab-mcp` |
 | `ynab-write.sbxenv.yaml` | `sbx env` file | Read-write sandbox: `base-claude` + `ynab-mcp` + `ynab-write` |
-| `github-network/`, `package-registries-network/` | v3 mixins | Network access for other, non-YNAB sandboxes. Not used by the YNAB environments |
 
 ## Requirements
 
