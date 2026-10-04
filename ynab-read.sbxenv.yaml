@@ -1,0 +1,39 @@
+# Read-only YNAB sandbox: base-claude + ynab-mcp, built from this repo.
+# The proxy admits only GETs to api.ynab.com.
+#
+#   sbx env plan   ./ynab-read.sbxenv.yaml   # preview, changes nothing
+#   sbx env create ./ynab-read.sbxenv.yaml   # create without attaching
+#   sbx secret set ynab --sandbox ynab-read  # paste the YNAB token
+#   sbx env run    ./ynab-read.sbxenv.yaml   # attach, then /login
+#   sbx env rm     ./ynab-read.sbxenv.yaml   # remove sandbox + its secrets
+#
+# The YNAB token is set by hand rather than declared here: a file secret
+# must be a literal value, a vault ref, or a host command. `sbx env rm`
+# still removes it, since it deletes every secret at the sandbox's scope.
+schemaVersion: "1"
+name: ynab-read
+agent: base-claude
+
+args:
+  planId:
+    default: ""
+    description: Default YNAB plan (UUID, last-used, or default); empty to choose per call
+
+kits:
+  - ./base-claude
+  - source: ./ynab-mcp
+    args:
+      planId: "${{ env.args.planId }}"
+
+# No workspace: nothing from the host is mounted, and the agent works in
+# the sandbox's own filesystem.
+
+# Approvals merged into ~/.config/sbx/credentials.yaml, so creation doesn't
+# stop to ask. They're global and survive `sbx env rm` (see --prune-bindings).
+bindings:
+  ynab:
+    apiKey:
+      domains: [api.ynab.com]
+  anthropic:
+    oauth:
+      domains: [platform.claude.com, api.anthropic.com]

@@ -1,0 +1,49 @@
+# syntax=docker/sandbox-kit:3
+# Opt-in write access for the ynab-mcp mixin, as its own kit so that
+# allowing changes to a real budget is a visible choice per sandbox:
+#
+#   sbx create claude --kit ./ynab-mcp --kit ./ynab-write
+#
+# Declaration-only: no content, just a wider grant, a signal variable and
+# a context note.
+schemaVersion: "3"
+displayName: YNAB MCP server (writes)
+description: >-
+  Lets the ynab-mcp mixin change YNAB data: unbounds api.ynab.com at the
+  proxy so the server's write tools stop being refused.
+sourceUrl: https://github.com/calebl/ynab-mcp-server
+licenses: [MIT]
+
+kind: mixin
+version: "1.0.0"
+
+provides: ["ynab-write"]
+
+# Useless on its own, and composing after ynab-mcp keeps its context
+# following the base kit's.
+requires: ["ynab-mcp-server"]
+
+args:
+  # Exported to the container as the signal ynab-mcp's context tells Claude
+  # to check before using a write tool. Only a signal: the network grant
+  # below is what actually lets writes through. The enum admits nothing
+  # else, so composing this kit always sets it.
+  writesEnabled:
+    default: "true"
+    enum: ["true"]
+    description: Fixed; composing this kit is what enables writes
+    env: YNAB_WRITES_ENABLED
+
+capabilities:
+  # An unbounded entry for the host ynab-mcp bounds to GET. Allow entries
+  # union across kits, and an unbounded grant absorbs a bounded one, so the
+  # composed sandbox reaches every method on api.ynab.com.
+  - type: com.docker.sandbox/network-policy@2
+    config:
+      runtime:
+        allow:
+          - api.ynab.com
+
+  - type: com.docker.sandbox/agent-context@1
+    config:
+      contentFile: ./ynab-write-context.md

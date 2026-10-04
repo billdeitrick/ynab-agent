@@ -1,0 +1,110 @@
+# syntax=docker/sandbox-kit:3
+# The YNAB MCP server (calebl/ynab-mcp-server) as a mixin: the server built
+# from a pinned release commit plus its own Node runtime, the YNAB token
+# held on the host and injected by the proxy, and a stdio registration with
+# Claude Code. Read-only: the proxy admits only GETs to api.ynab.com, so
+# the write tools are listed but refused with 403. Compose ../ynab-write as
+# well to allow changes; it also sets YNAB_WRITES_ENABLED=true, the signal
+# the agent context tells Claude to check before writing.
+#
+# Bind the token on the host, scoped to one sandbox:
+#   sbx secret set ynab --sandbox <name>     # a YNAB Personal Access Token
+schemaVersion: "3"
+displayName: YNAB MCP server
+description: >-
+  calebl/ynab-mcp-server built from a pinned release commit, registered
+  with Claude Code over stdio, read-only at the proxy, with the YNAB token
+  proxy-managed so it never enters the sandbox.
+sourceUrl: https://github.com/calebl/ynab-mcp-server
+licenses: [MIT]
+
+kind: mixin
+
+args:
+  # A bump edits both: the commit is what gets built, and the build fails
+  # unless that commit's package.json carries the version.
+  version:
+    default: "0.3.0"
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+    description: ynab-mcp-server release the commit below belongs to
+    buildArg: YNAB_MCP_VERSION
+  commit:
+    default: "483b4af134dad9b279a239864484f567149c2da7"
+    pattern: '^[0-9a-f]{40}$'
+    description: Commit the release tag pointed at when pinned (0.3.0)
+    buildArg: YNAB_MCP_COMMIT
+  planId:
+    default: ""
+    # A plan UUID, or YNAB's own aliases. Empty leaves the agent to call
+    # ynab_list_plans and pass planId explicitly.
+    pattern: '^([0-9a-fA-F-]{36}|last-used|default)?$'
+    description: Default YNAB plan for tools called without a planId
+    env: YNAB_PLAN_ID
+
+provides: ["ynab-mcp-server@${{ kit.args.version }}"]
+
+# Order our install hooks after the Claude kit's when one is present: its
+# hooks rewrite ~/.claude.json wholesale, which would drop our registration.
+integrates: ["claude"]
+
+capabilities:
+  # The server talks to exactly one host, and this kit grants it reads
+  # only. The proxy injects the token into every request to api.ynab.com,
+  # whoever sends it, and a YNAB personal access token cannot be scoped to
+  # reads, so the boundary is the one place a read-only grant holds: a
+  # POST/PUT/PATCH/DELETE from the MCP server or from curl alike gets a 403.
+  # The ynab-write mixin adds an unbounded entry for the host, which
+  # composition lets win. Built at image build time, so no install phase.
+  - type: com.docker.sandbox/network-policy@2
+    config:
+      runtime:
+        allow:
+          - hosts: [api.ynab.com]
+            methods: [GET]
+
+  # Optional so the sandbox can be created before its sandbox-scoped secret
+  # exists (sbx secret set ynab --sandbox <name>); it is runtime-only, and
+  # sbx applies a scoped secret to a live sandbox without a restart.
+  # YNAB_API_TOKEN inside the sandbox is a sentinel; the proxy sets the
+  # real bearer on api.ynab.com.
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: YNAB Personal Access Token
+    config:
+      service: ynab
+      phase: runtime
+      apiKey:
+        name: YNAB_API_TOKEN
+        proxyManaged: true
+        inject:
+          - {domain: api.ynab.com, header: Authorization, format: "Bearer %s"}
+
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        # User scope, so the server is available in every project. `claude
+        # mcp add` exits 1 when the entry already exists, which a recreate
+        # can carry forward, hence `|| true`.
+        - command: |
+            set -e
+            export PATH="$HOME/.local/bin:$HOME/.claude/local:$PATH"
+            command -v claude >/dev/null || { echo "claude not on PATH; skipping YNAB MCP registration" >&2; exit 0; }
+            claude mcp add ynab --scope user -- /usr/local/bin/ynab-mcp-server || true
+          user: agent
+          description: Register the YNAB MCP server with Claude Code
+      startup:
+        # Fallback for a create where the install hook could not register.
+        # Non-destructive: startup hooks can race a live session.
+        - command: |
+            set -e
+            export PATH="$HOME/.local/bin:$HOME/.claude/local:$PATH"
+            command -v claude >/dev/null || exit 0
+            claude mcp get ynab >/dev/null 2>&1 || claude mcp add ynab --scope user -- /usr/local/bin/ynab-mcp-server || true
+          user: agent
+          description: Register the YNAB MCP server (startup fallback)
+
+  - type: com.docker.sandbox/agent-context@1
+    config:
+      contentFile: ./ynab-mcp-context.md
+
+dockerfile: ynab-mcp.dockerfile

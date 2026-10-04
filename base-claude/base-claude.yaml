@@ -1,0 +1,53 @@
+# syntax=docker/sandbox-kit:3
+
+schemaVersion: "3"
+kind: workload
+
+capabilities:
+  - type: com.docker.sandbox/sbx@1
+  - type: com.docker.sandbox/network-policy@1
+    config:
+      runtime:
+        allow:
+          - api.anthropic.com
+          - platform.claude.com
+          - downloads.claude.ai
+
+  # claude.ai OAuth (/login), held on the host. The proxy intercepts the
+  # token exchange at platform.claude.com, keeps the real access and
+  # refresh tokens, and renders sentinels into ~/.claude/.credentials.json;
+  # requests to api.anthropic.com carrying a sentinel get the real bearer.
+  # Nothing in the sandbox can read or copy the real token. Optional
+  # because an OAuth record is never a literal value at create, so
+  # required would warn on exactly the healthy setup.
+  - type: com.docker.sandbox/credential@1
+    optional: true
+    description: Claude account (claude.ai OAuth via /login)
+    config:
+      service: anthropic
+      phase: runtime
+      oauth:
+        tokenEndpoint: {host: platform.claude.com, path: /v1/oauth/token}
+        resourceHosts: [api.anthropic.com]
+        sentinels:
+          accessToken: sk-ant-oat01-proxy-managed
+          refreshToken: sk-ant-ort01-proxy-managed
+        credentialFile:
+          path: ~/.claude/.credentials.json
+          structure:
+            claudeAiOauth:
+              accessToken: "{{.AccessToken}}"
+              refreshToken: "{{.RefreshToken}}"
+              expiresAt: "{{.ExpiresAt}}"
+              scopes: "{{.Scopes}}"
+
+  # The workload owns the agent's profile: without a filename the runtime
+  # materializes no CLAUDE.md, and mixin context (ynab-mcp's read-only
+  # rules, for one) has nowhere to be indexed. Mixins appear under the
+  # profile's Kits section as pointers, so the body says to follow them.
+  - type: com.docker.sandbox/agent-context@1
+    config:
+      filename: CLAUDE.md
+      content: |
+        Before using a kit's tools, read the context file that kit lists under
+        Kits below. Those files state what the tools may do in this sandbox.
