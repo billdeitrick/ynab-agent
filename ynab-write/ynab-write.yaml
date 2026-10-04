@@ -2,7 +2,9 @@
 # Opt-in write access for the ynab-mcp mixin, as its own kit so that
 # allowing changes to a real budget is a visible choice per sandbox:
 #
-#   sbx create claude --kit ./ynab-mcp --kit ./ynab-write
+#   sbx env create ./ynab-write.sbxenv.yaml
+#
+# which composes ./base-claude + ./ynab-mcp + ./ynab-write.
 #
 # Declaration-only: no content, just a wider grant, a signal variable and
 # a context note.
